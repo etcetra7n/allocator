@@ -370,14 +370,18 @@ const BudgetAllocator = () => {
                     <div
                       key={`handle-${fund.id}`}
                       className="absolute transform -translate-x-1/2 cursor-ew-resize z-10 group"
-                      style={{ left: `${cumulativePercentage}%`, top: '84px' }}
+                      style={{ left: `${cumulativePercentage}%`, top: '84px', touchAction: 'none' }}
                       onMouseDown={(e) => {
+                        e.preventDefault();
+                        setDragging({ fundId: fund.id, idx });
+                      }}
+                      onTouchStart={(e) => {
                         e.preventDefault();
                         setDragging({ fundId: fund.id, idx });
                       }}
                     >
                       <div 
-                        className="w-6 h-6 bg-white rounded-full border-2 shadow-md group-hover:scale-110 group-hover:shadow-lg transition-all duration-200"
+                        className="w-8 h-8 md:w-6 md:h-6 bg-white rounded-full border-2 shadow-md group-hover:scale-110 group-hover:shadow-lg transition-all duration-200"
                         style={{ 
                           borderColor: fund.color,
                           cursor: dragging ? 'grabbing' : 'grab'
