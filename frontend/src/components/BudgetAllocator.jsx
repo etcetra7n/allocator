@@ -333,8 +333,8 @@ const BudgetAllocator = () => {
 
                 {/* Slider track */}
                 <div
-                  className="absolute w-full h-3 rounded-full overflow-hidden shadow-inner"
-                  style={{ top: '90px', backgroundColor: '#e5e7eb' }}
+                  className="absolute w-full h-4 md:h-3 rounded-full overflow-hidden shadow-inner"
+                  style={{ top: '90px', backgroundColor: '#e5e7eb', touchAction: 'none' }}
                   ref={sliderRef}
                 >
                   {funds.map((fund, idx) => {
