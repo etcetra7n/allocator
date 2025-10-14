@@ -305,8 +305,8 @@ const BudgetAllocator = () => {
 
                 {/* Slider track */}
                 <div
-                  className="absolute w-full h-3 rounded-full overflow-hidden"
-                  style={{ top: '90px' }}
+                  className="absolute w-full h-3 rounded-full overflow-hidden shadow-inner"
+                  style={{ top: '90px', backgroundColor: '#e5e7eb' }}
                   ref={sliderRef}
                 >
                   {funds.map((fund, idx) => {
@@ -318,7 +318,7 @@ const BudgetAllocator = () => {
                     return (
                       <div
                         key={fund.id}
-                        className="absolute h-full transition-all duration-200"
+                        className="absolute h-full transition-all duration-150 ease-out"
                         style={{
                           left: `${cumulativePercentage}%`,
                           width: `${fund.percentage}%`,
