@@ -303,9 +303,9 @@ const BudgetAllocator = () => {
             </div>
 
             {/* Multi-handle Slider */}
-            <div className="mt-16">
+            <div className="mt-8 md:mt-16">
               <h3 className="text-sm font-medium text-gray-700 mb-8">Allocation Slider</h3>
-              <div className="relative" style={{ height: '150px', marginBottom: '40px' }}>
+              <div className="relative overflow-x-auto" style={{ height: '150px', marginBottom: '40px' }}>
                 {/* Labels above slider */}
                 {funds.map((fund, idx) => {
                   let cumulativePercentage = 0;
