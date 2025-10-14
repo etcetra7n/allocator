@@ -240,7 +240,19 @@ const BudgetAllocator = () => {
 
             {/* Funds List */}
             <div className="mb-8">
-              <h3 className="text-sm font-medium text-gray-700 mb-4">Your Funds</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-gray-700">Your Funds</h3>
+                <div className="text-sm">
+                  <span className="text-gray-600">Total: </span>
+                  <span className={`font-semibold ${
+                    Math.abs(funds.reduce((sum, f) => sum + f.percentage, 0) - 100) < 0.1 
+                      ? 'text-green-600' 
+                      : 'text-amber-600'
+                  }`}>
+                    {funds.reduce((sum, f) => sum + f.percentage, 0).toFixed(1)}%
+                  </span>
+                </div>
+              </div>
               <div className="space-y-2">
                 {funds.map((fund) => (
                   <div
@@ -256,7 +268,7 @@ const BudgetAllocator = () => {
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="text-sm text-gray-600">
-                        {fund.percentage.toFixed(1)}% • ${((totalBudget * fund.percentage) / 100).toFixed(2)}
+                        {fund.percentage.toFixed(1)}% • ${((totalBudget * fund.percentage) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                       {funds.length > 1 && (
                         <Button
