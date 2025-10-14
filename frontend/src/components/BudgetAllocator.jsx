@@ -98,16 +98,43 @@ const BudgetAllocator = () => {
     if (!newFundName.trim()) return;
     
     const existingPercentage = funds.reduce((sum, f) => sum + f.percentage, 0);
-    const remainingPercentage = Math.max(0, 100 - existingPercentage);
+    let remainingPercentage = Math.max(0, 100 - existingPercentage);
     
-    const newFund = {
-      id: Date.now(),
-      name: newFundName,
-      percentage: remainingPercentage,
-      color: COLORS[funds.length % COLORS.length],
-    };
+    // If no remaining percentage, redistribute by taking equally from all existing funds
+    if (remainingPercentage === 0) {
+      const redistributionAmount = 10; // Take 10% for new fund
+      const takeFromEach = redistributionAmount / funds.length;
+      
+      const adjustedFunds = funds.map(f => ({
+        ...f,
+        percentage: Math.max(5, f.percentage - takeFromEach) // Don't go below 5%
+      }));
+      
+      // Calculate actual amount taken
+      const actualTaken = funds.reduce((sum, f, idx) => 
+        sum + (f.percentage - adjustedFunds[idx].percentage), 0);
+      
+      remainingPercentage = actualTaken;
+      
+      const newFund = {
+        id: Date.now(),
+        name: newFundName,
+        percentage: remainingPercentage,
+        color: COLORS[funds.length % COLORS.length],
+      };
+      
+      setFunds([...adjustedFunds, newFund]);
+    } else {
+      const newFund = {
+        id: Date.now(),
+        name: newFundName,
+        percentage: remainingPercentage,
+        color: COLORS[funds.length % COLORS.length],
+      };
+      
+      setFunds([...funds, newFund]);
+    }
     
-    setFunds([...funds, newFund]);
     setNewFundName('');
   };
 
