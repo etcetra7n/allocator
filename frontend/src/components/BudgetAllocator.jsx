@@ -282,8 +282,8 @@ const BudgetAllocator = () => {
                       />
                       <span className="font-medium text-gray-800">{fund.name}</span>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-sm text-gray-600">
+                    <div className="flex items-center gap-2 md:gap-4">
+                      <span className="text-xs md:text-sm text-gray-600">
                         {fund.percentage.toFixed(1)}% • ${((totalBudget * fund.percentage) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                       {funds.length > 1 && (
@@ -291,7 +291,7 @@ const BudgetAllocator = () => {
                           variant="ghost"
                           size="sm"
                           onClick={() => removeFund(fund.id)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
