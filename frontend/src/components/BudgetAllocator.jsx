@@ -289,15 +289,15 @@ const BudgetAllocator = () => {
                   return (
                     <div
                       key={fund.id}
-                      className="absolute transform -translate-x-1/2 text-center"
+                      className="absolute transform -translate-x-1/2 text-center transition-all duration-150"
                       style={{ left: `${position}%`, top: '0px' }}
                     >
-                      <div className="text-xs font-medium text-gray-600 mb-1">{fund.name}</div>
-                      <div className="text-lg font-semibold" style={{ color: fund.color }}>
+                      <div className="text-xs font-medium text-gray-600 mb-1 whitespace-nowrap">{fund.name}</div>
+                      <div className="text-lg font-semibold transition-colors" style={{ color: fund.color }}>
                         {fund.percentage.toFixed(1)}%
                       </div>
-                      <div className="text-xs text-gray-500">
-                        ${((totalBudget * fund.percentage) / 100).toFixed(2)}
+                      <div className="text-xs text-gray-500 whitespace-nowrap">
+                        ${((totalBudget * fund.percentage) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
                   );
