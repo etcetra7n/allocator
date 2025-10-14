@@ -211,14 +211,14 @@ const BudgetAllocator = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
+    <div className="min-h-screen bg-gray-50 py-4 md:py-12 px-4">
       <div className="max-w-4xl mx-auto">
         <Card className="shadow-lg">
           <CardHeader className="border-b bg-white">
-            <CardTitle className="text-3xl font-semibold text-gray-800">Budget Allocator</CardTitle>
-            <p className="text-gray-600 mt-2">Allocate your budget across different funds</p>
+            <CardTitle className="text-2xl md:text-3xl font-semibold text-gray-800">Budget Allocator</CardTitle>
+            <p className="text-sm md:text-base text-gray-600 mt-2">Allocate your budget across different funds</p>
           </CardHeader>
-          <CardContent className="p-8">
+          <CardContent className="p-4 md:p-8">
             {/* Total Budget Input */}
             <div className="mb-12">
               <label className="block text-sm font-medium text-gray-700 mb-2">
