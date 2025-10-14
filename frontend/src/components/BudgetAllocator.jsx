@@ -36,6 +36,59 @@ const BudgetAllocator = () => {
     }
   }, []);
 
+  // Handle mouse drag
+  useEffect(() => {
+    if (!dragging) return;
+
+    const handleMouseMove = (e) => {
+      if (!sliderRef.current) return;
+
+      const rect = sliderRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
+
+      // Calculate which fund boundary this represents
+      const { idx } = dragging;
+      
+      // Get cumulative percentage up to this fund
+      let minPercentage = 0;
+      for (let i = 0; i < idx; i++) {
+        minPercentage += funds[i].percentage;
+      }
+      
+      // Get cumulative percentage after this fund
+      let maxPercentage = 100;
+      for (let i = idx + 2; i < funds.length; i++) {
+        maxPercentage -= funds[i].percentage;
+      }
+
+      // Clamp the percentage
+      const clampedPercentage = Math.max(minPercentage + 1, Math.min(maxPercentage - 1, percentage));
+
+      // Calculate new percentages for the two adjacent funds
+      const leftFundPercentage = clampedPercentage - minPercentage;
+      const rightFundPercentage = maxPercentage - clampedPercentage;
+
+      // Update funds
+      const newFunds = [...funds];
+      newFunds[idx] = { ...newFunds[idx], percentage: leftFundPercentage };
+      newFunds[idx + 1] = { ...newFunds[idx + 1], percentage: rightFundPercentage };
+      setFunds(newFunds);
+    };
+
+    const handleMouseUp = () => {
+      setDragging(null);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [dragging, funds]);
+
   // Save to localStorage whenever data changes
   useEffect(() => {
     localStorage.setItem('budgetAllocator', JSON.stringify({ totalBudget, funds }));
