@@ -1,0 +1,286 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+
+const COLORS = [
+  '#3b82f6', // blue
+  '#10b981', // green
+  '#f59e0b', // amber
+  '#ef4444', // red
+  '#8b5cf6', // violet
+  '#ec4899', // pink
+  '#06b6d4', // cyan
+  '#f97316', // orange
+];
+
+const BudgetAllocator = () => {
+  const [totalBudget, setTotalBudget] = useState(10000);
+  const [funds, setFunds] = useState([
+    { id: 1, name: 'Savings', percentage: 40, color: COLORS[0] },
+    { id: 2, name: 'Investment', percentage: 30, color: COLORS[1] },
+    { id: 3, name: 'Emergency Fund', percentage: 30, color: COLORS[2] },
+  ]);
+  const [newFundName, setNewFundName] = useState('');
+  const sliderRef = useRef(null);
+  const [dragging, setDragging] = useState(null);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const savedData = localStorage.getItem('budgetAllocator');
+    if (savedData) {
+      const { totalBudget: saved, funds: savedFunds } = JSON.parse(savedData);
+      setTotalBudget(saved);
+      setFunds(savedFunds);
+    }
+  }, []);
+
+  // Save to localStorage whenever data changes
+  useEffect(() => {
+    localStorage.setItem('budgetAllocator', JSON.stringify({ totalBudget, funds }));
+  }, [totalBudget, funds]);
+
+  const addFund = () => {
+    if (!newFundName.trim()) return;
+    
+    const existingPercentage = funds.reduce((sum, f) => sum + f.percentage, 0);
+    const remainingPercentage = Math.max(0, 100 - existingPercentage);
+    
+    const newFund = {
+      id: Date.now(),
+      name: newFundName,
+      percentage: remainingPercentage,
+      color: COLORS[funds.length % COLORS.length],
+    };
+    
+    setFunds([...funds, newFund]);
+    setNewFundName('');
+  };
+
+  const removeFund = (id) => {
+    if (funds.length <= 1) return;
+    const newFunds = funds.filter(f => f.id !== id);
+    // Redistribute the percentage proportionally
+    redistributePercentages(newFunds);
+  };
+
+  const redistributePercentages = (fundsList) => {
+    const total = fundsList.reduce((sum, f) => sum + f.percentage, 0);
+    if (total === 0 || fundsList.length === 0) {
+      const equalPercentage = 100 / fundsList.length;
+      setFunds(fundsList.map(f => ({ ...f, percentage: equalPercentage })));
+      return;
+    }
+    
+    const adjustedFunds = fundsList.map(f => ({
+      ...f,
+      percentage: (f.percentage / total) * 100
+    }));
+    setFunds(adjustedFunds);
+  };
+
+  const handleSliderChange = (fundId, newPercentage) => {
+    const fundIndex = funds.findIndex(f => f.id === fundId);
+    if (fundIndex === -1) return;
+
+    const oldPercentage = funds[fundIndex].percentage;
+    const diff = newPercentage - oldPercentage;
+
+    // Calculate total of other funds
+    const otherFunds = funds.filter(f => f.id !== fundId);
+    const otherTotal = otherFunds.reduce((sum, f) => sum + f.percentage, 0);
+
+    if (otherTotal === 0) {
+      // If all other funds are 0, can't adjust
+      return;
+    }
+
+    // Adjust other funds proportionally
+    const adjustedFunds = funds.map((fund, idx) => {
+      if (fund.id === fundId) {
+        return { ...fund, percentage: newPercentage };
+      } else {
+        const ratio = fund.percentage / otherTotal;
+        const adjustment = diff * ratio;
+        return { ...fund, percentage: Math.max(0, fund.percentage - adjustment) };
+      }
+    });
+
+    setFunds(adjustedFunds);
+  };
+
+  const getPosition = (percentage) => {
+    return percentage;
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-12 px-4">
+      <div className="max-w-4xl mx-auto">
+        <Card className="shadow-lg">
+          <CardHeader className="border-b bg-white">
+            <CardTitle className="text-3xl font-semibold text-gray-800">Budget Allocator</CardTitle>
+            <p className="text-gray-600 mt-2">Allocate your budget across different funds</p>
+          </CardHeader>
+          <CardContent className="p-8">
+            {/* Total Budget Input */}
+            <div className="mb-12">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Total Budget Amount
+              </label>
+              <Input
+                type="number"
+                value={totalBudget}
+                onChange={(e) => setTotalBudget(Number(e.target.value) || 0)}
+                className="text-2xl font-semibold h-14"
+                placeholder="Enter total budget"
+              />
+            </div>
+
+            {/* Add Fund Section */}
+            <div className="mb-12">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Add New Fund
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  value={newFundName}
+                  onChange={(e) => setNewFundName(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && addFund()}
+                  placeholder="Fund name (e.g., Entertainment, Bills)"
+                  className="flex-1"
+                />
+                <Button onClick={addFund} className="px-6">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add
+                </Button>
+              </div>
+            </div>
+
+            {/* Funds List */}
+            <div className="mb-8">
+              <h3 className="text-sm font-medium text-gray-700 mb-4">Your Funds</h3>
+              <div className="space-y-2">
+                {funds.map((fund) => (
+                  <div
+                    key={fund.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-4 h-4 rounded"
+                        style={{ backgroundColor: fund.color }}
+                      />
+                      <span className="font-medium text-gray-800">{fund.name}</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm text-gray-600">
+                        {fund.percentage.toFixed(1)}% • ${((totalBudget * fund.percentage) / 100).toFixed(2)}
+                      </span>
+                      {funds.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFund(fund.id)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Multi-handle Slider */}
+            <div className="mt-16">
+              <h3 className="text-sm font-medium text-gray-700 mb-8">Allocation Slider</h3>
+              <div className="relative" style={{ height: '150px', marginBottom: '40px' }}>
+                {/* Labels above slider */}
+                {funds.map((fund, idx) => {
+                  let cumulativePercentage = 0;
+                  for (let i = 0; i < idx; i++) {
+                    cumulativePercentage += funds[i].percentage;
+                  }
+                  const position = cumulativePercentage + fund.percentage / 2;
+                  
+                  return (
+                    <div
+                      key={fund.id}
+                      className="absolute transform -translate-x-1/2 text-center"
+                      style={{ left: `${position}%`, top: '0px' }}
+                    >
+                      <div className="text-xs font-medium text-gray-600 mb-1">{fund.name}</div>
+                      <div className="text-lg font-semibold" style={{ color: fund.color }}>
+                        {fund.percentage.toFixed(1)}%
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        ${((totalBudget * fund.percentage) / 100).toFixed(2)}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Slider track */}
+                <div
+                  className="absolute w-full h-3 rounded-full overflow-hidden"
+                  style={{ top: '90px' }}
+                  ref={sliderRef}
+                >
+                  {funds.map((fund, idx) => {
+                    let cumulativePercentage = 0;
+                    for (let i = 0; i < idx; i++) {
+                      cumulativePercentage += funds[i].percentage;
+                    }
+                    
+                    return (
+                      <div
+                        key={fund.id}
+                        className="absolute h-full transition-all duration-200"
+                        style={{
+                          left: `${cumulativePercentage}%`,
+                          width: `${fund.percentage}%`,
+                          backgroundColor: fund.color,
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+
+                {/* Handles */}
+                {funds.map((fund, idx) => {
+                  let cumulativePercentage = 0;
+                  for (let i = 0; i <= idx; i++) {
+                    cumulativePercentage += funds[i].percentage;
+                  }
+                  
+                  if (idx === funds.length - 1) return null; // No handle after last fund
+                  
+                  return (
+                    <div
+                      key={`handle-${fund.id}`}
+                      className="absolute transform -translate-x-1/2 cursor-ew-resize z-10 group"
+                      style={{ left: `${cumulativePercentage}%`, top: '84px' }}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setDragging({ fundId: fund.id, idx });
+                      }}
+                    >
+                      <div className="w-6 h-6 bg-white rounded-full border-2 shadow-md group-hover:scale-110 transition-transform"
+                        style={{ borderColor: fund.color }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+export default BudgetAllocator;
