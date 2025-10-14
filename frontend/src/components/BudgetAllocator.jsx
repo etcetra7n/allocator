@@ -348,8 +348,12 @@ const BudgetAllocator = () => {
                         setDragging({ fundId: fund.id, idx });
                       }}
                     >
-                      <div className="w-6 h-6 bg-white rounded-full border-2 shadow-md group-hover:scale-110 transition-transform"
-                        style={{ borderColor: fund.color }}
+                      <div 
+                        className="w-6 h-6 bg-white rounded-full border-2 shadow-md group-hover:scale-110 group-hover:shadow-lg transition-all duration-200"
+                        style={{ 
+                          borderColor: fund.color,
+                          cursor: dragging ? 'grabbing' : 'grab'
+                        }}
                       />
                     </div>
                   );
