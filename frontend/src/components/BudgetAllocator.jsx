@@ -36,15 +36,15 @@ const BudgetAllocator = () => {
     }
   }, []);
 
-  // Handle mouse drag
+  // Handle mouse and touch drag
   useEffect(() => {
     if (!dragging) return;
 
-    const handleMouseMove = (e) => {
+    const handleMove = (clientX) => {
       if (!sliderRef.current) return;
 
       const rect = sliderRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
+      const x = clientX - rect.left;
       const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
 
       // Calculate which fund boundary this represents
@@ -76,16 +76,32 @@ const BudgetAllocator = () => {
       setFunds(newFunds);
     };
 
-    const handleMouseUp = () => {
+    const handleMouseMove = (e) => {
+      e.preventDefault();
+      handleMove(e.clientX);
+    };
+
+    const handleTouchMove = (e) => {
+      e.preventDefault();
+      if (e.touches.length > 0) {
+        handleMove(e.touches[0].clientX);
+      }
+    };
+
+    const handleEnd = () => {
       setDragging(null);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mouseup', handleEnd);
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleEnd);
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mouseup', handleEnd);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleEnd);
     };
   }, [dragging, funds]);
 
