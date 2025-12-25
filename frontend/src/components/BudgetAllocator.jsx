@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, GripVertical } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -17,6 +17,7 @@ const COLORS = [
 
 const BudgetAllocator = () => {
   const [totalBudget, setTotalBudget] = useState(10000);
+  const [budgetInput, setBudgetInput] = useState('10000');
   const [funds, setFunds] = useState([
     { id: 1, name: 'Savings', percentage: 40, color: COLORS[0] },
     { id: 2, name: 'Investment', percentage: 30, color: COLORS[1] },
@@ -25,6 +26,9 @@ const BudgetAllocator = () => {
   const [newFundName, setNewFundName] = useState('');
   const sliderRef = useRef(null);
   const [dragging, setDragging] = useState(null);
+  const [draggedFund, setDraggedFund] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [touchDragState, setTouchDragState] = useState(null);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -32,6 +36,7 @@ const BudgetAllocator = () => {
     if (savedData) {
       const { totalBudget: saved, funds: savedFunds } = JSON.parse(savedData);
       setTotalBudget(saved);
+      setBudgetInput(String(saved));
       setFunds(savedFunds);
     }
   }, []);
@@ -210,6 +215,97 @@ const BudgetAllocator = () => {
     return percentage;
   };
 
+  const handleDragStart = (e, fundId) => {
+    setDraggedFund(fundId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedFund(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (e, targetIndex) => {
+    e.preventDefault();
+    
+    if (draggedFund === null) return;
+    
+    const draggedIndex = funds.findIndex(f => f.id === draggedFund);
+    if (draggedIndex === -1 || draggedIndex === targetIndex) {
+      setDraggedFund(null);
+      setDragOverIndex(null);
+      return;
+    }
+    
+    const newFunds = [...funds];
+    const [removed] = newFunds.splice(draggedIndex, 1);
+    newFunds.splice(targetIndex, 0, removed);
+    
+    setFunds(newFunds);
+    setDraggedFund(null);
+    setDragOverIndex(null);
+  };
+
+  const handleTouchStart = (e, fundId, index) => {
+    const touch = e.touches[0];
+    setTouchDragState({
+      fundId,
+      startIndex: index,
+      startY: touch.clientY,
+      currentY: touch.clientY,
+    });
+    setDraggedFund(fundId);
+  };
+
+  const handleTouchMove = (e, funds) => {
+    if (!touchDragState) return;
+    
+    const touch = e.touches[0];
+    const currentY = touch.clientY;
+    
+    // Find which fund is under the touch
+    const element = document.elementFromPoint(touch.clientX, currentY);
+    if (element) {
+      const fundElement = element.closest('[data-fund-index]');
+      if (fundElement) {
+        const targetIndex = parseInt(fundElement.getAttribute('data-fund-index'));
+        setDragOverIndex(targetIndex);
+      }
+    }
+    
+    setTouchDragState({
+      ...touchDragState,
+      currentY,
+    });
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchDragState || dragOverIndex === null) {
+      setTouchDragState(null);
+      setDraggedFund(null);
+      setDragOverIndex(null);
+      return;
+    }
+    
+    const draggedIndex = funds.findIndex(f => f.id === touchDragState.fundId);
+    if (draggedIndex !== -1 && draggedIndex !== dragOverIndex) {
+      const newFunds = [...funds];
+      const [removed] = newFunds.splice(draggedIndex, 1);
+      newFunds.splice(dragOverIndex, 0, removed);
+      setFunds(newFunds);
+    }
+    
+    setTouchDragState(null);
+    setDraggedFund(null);
+    setDragOverIndex(null);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-4 md:py-12 px-4">
       <div className="max-w-4xl mx-auto">
@@ -226,8 +322,26 @@ const BudgetAllocator = () => {
               </label>
               <Input
                 type="number"
-                value={totalBudget}
-                onChange={(e) => setTotalBudget(Number(e.target.value) || 0)}
+                value={budgetInput}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setBudgetInput(value);
+                  
+                  // Update actual budget for calculations
+                  const numValue = Number(value);
+                  if (!isNaN(numValue) && value !== '') {
+                    setTotalBudget(numValue);
+                  } else if (value === '') {
+                    setTotalBudget(0);
+                  }
+                }}
+                onBlur={() => {
+                  // On blur, if empty, set to 0
+                  if (budgetInput === '' || budgetInput === '-') {
+                    setBudgetInput('0');
+                    setTotalBudget(0);
+                  }
+                }}
                 className="text-2xl font-semibold h-14"
                 placeholder="Enter total budget"
               />
@@ -270,12 +384,28 @@ const BudgetAllocator = () => {
                 </div>
               </div>
               <div className="space-y-2">
-                {funds.map((fund) => (
+                {funds.map((fund, index) => (
                   <div
                     key={fund.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                    data-fund-index={index}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, fund.id)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDragEnd={handleDragEnd}
+                    onDrop={(e) => handleDrop(e, index)}
+                    onTouchStart={(e) => handleTouchStart(e, fund.id, index)}
+                    onTouchMove={(e) => handleTouchMove(e, funds)}
+                    onTouchEnd={handleTouchEnd}
+                    className={`flex items-center justify-between p-3 bg-gray-50 rounded-lg border-2 transition-all ${
+                      draggedFund === fund.id 
+                        ? 'opacity-50 border-gray-400 scale-105' 
+                        : dragOverIndex === index 
+                          ? 'border-blue-400 bg-blue-50' 
+                          : 'border-gray-200 hover:border-gray-300'
+                    }`}
                   >
                     <div className="flex items-center gap-3">
+                      <GripVertical className="w-5 h-5 text-gray-400 cursor-grab active:cursor-grabbing touch-none" />
                       <div
                         className="w-4 h-4 rounded"
                         style={{ backgroundColor: fund.color }}
