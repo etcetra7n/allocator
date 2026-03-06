@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Eye, EyeOff } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 const COLORS = [
   '#3b82f6', // blue
@@ -13,15 +14,22 @@ const COLORS = [
   '#ec4899', // pink
   '#06b6d4', // cyan
   '#f97316', // orange
+  '#3d4451', // slate
+  '#4b5563', // gray-600
+  '#7c3aed', // purple-600
+  '#db2777', // pink-600
+  '#0ea5e9', // cyan-600
 ];
 
 const BudgetAllocator = () => {
   const [totalBudget, setTotalBudget] = useState(10000);
   const [budgetInput, setBudgetInput] = useState('10000');
   const [funds, setFunds] = useState([
-    { id: 1, name: 'Savings', percentage: 40, color: COLORS[0] },
-    { id: 2, name: 'Investment', percentage: 30, color: COLORS[1] },
-    { id: 3, name: 'Emergency Fund', percentage: 30, color: COLORS[2] },
+    { id: 1, name: 'Expense', percentage: 40, color: COLORS[0], hidden: false },
+    { id: 2, name: 'Invest', percentage: 20, color: COLORS[1], hidden: false },
+    { id: 3, name: 'Credit', percentage: 10, color: COLORS[2], hidden: false },
+    { id: 4, name: 'Projects', percentage: 20, color: COLORS[3], hidden: false },
+    { id: 5, name: 'Proc', percentage: 10, color: COLORS[4], hidden: false },
   ]);
   const [newFundName, setNewFundName] = useState('');
   const sliderRef = useRef(null);
@@ -29,6 +37,9 @@ const BudgetAllocator = () => {
   const [draggedFund, setDraggedFund] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const [touchDragState, setTouchDragState] = useState(null);
+  const [editingFundId, setEditingFundId] = useState(null);
+  const [editingName, setEditingName] = useState('');
+  const [colorPickerOpen, setColorPickerOpen] = useState(null);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -142,6 +153,7 @@ const BudgetAllocator = () => {
         name: newFundName,
         percentage: remainingPercentage,
         color: COLORS[funds.length % COLORS.length],
+        hidden: false,
       };
       
       setFunds([...adjustedFunds, newFund]);
@@ -151,6 +163,7 @@ const BudgetAllocator = () => {
         name: newFundName,
         percentage: remainingPercentage,
         color: COLORS[funds.length % COLORS.length],
+        hidden: false,
       };
       
       setFunds([...funds, newFund]);
@@ -180,6 +193,43 @@ const BudgetAllocator = () => {
     }));
     setFunds(adjustedFunds);
   };
+
+  const toggleHide = (id) => {
+    setFunds(funds.map(f => 
+      f.id === id ? { ...f, hidden: !f.hidden } : f
+    ));
+  };
+
+  const startRename = (fund) => {
+    setEditingFundId(fund.id);
+    setEditingName(fund.name);
+  };
+
+  const saveRename = () => {
+    if (editingFundId && editingName.trim()) {
+      setFunds(funds.map(f => 
+        f.id === editingFundId ? { ...f, name: editingName.trim() } : f
+      ));
+    }
+    setEditingFundId(null);
+    setEditingName('');
+  };
+
+  const cancelRename = () => {
+    setEditingFundId(null);
+    setEditingName('');
+  };
+
+  const changeColor = (fundId, color) => {
+    setFunds(funds.map(f => 
+      f.id === fundId ? { ...f, color } : f
+    ));
+    setColorPickerOpen(null);
+  };
+
+  // Get visible funds for slider display
+  const visibleFunds = funds.filter(f => !f.hidden);
+  const visibleTotal = visibleFunds.reduce((sum, f) => sum + f.percentage, 0);
 
   const handleSliderChange = (fundId, newPercentage) => {
     const fundIndex = funds.findIndex(f => f.id === fundId);
@@ -308,7 +358,7 @@ const BudgetAllocator = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-4 md:py-12 px-4">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <Card className="shadow-lg">
           <CardHeader className="border-b bg-white">
             <CardTitle className="text-2xl md:text-3xl font-semibold text-gray-800">Budget Allocator</CardTitle>
@@ -405,17 +455,65 @@ const BudgetAllocator = () => {
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <GripVertical className="w-5 h-5 text-gray-400 cursor-grab active:cursor-grabbing touch-none" />
-                      <div
-                        className="w-4 h-4 rounded"
-                        style={{ backgroundColor: fund.color }}
-                      />
-                      <span className="font-medium text-gray-800">{fund.name}</span>
+                      <GripVertical className={`w-5 h-5 cursor-grab active:cursor-grabbing touch-none ${fund.hidden ? 'text-gray-300' : 'text-gray-400'}`} />
+                      <Popover open={colorPickerOpen === fund.id} onOpenChange={(open) => setColorPickerOpen(open ? fund.id : null)}>
+                        <PopoverTrigger asChild>
+                          <button
+                            className={`w-5 h-5 rounded cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-gray-400 transition-all ${fund.hidden ? 'opacity-40' : ''}`}
+                            style={{ backgroundColor: fund.color }}
+                            title="Click to change color"
+                          />
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-3" align="start">
+                          <div className="grid grid-cols-5 gap-2">
+                            {COLORS.map((color) => (
+                              <button
+                                key={color}
+                                className={`w-6 h-6 rounded cursor-pointer hover:scale-110 transition-transform ${color === fund.color ? 'ring-2 ring-offset-1 ring-gray-600' : ''}`}
+                                style={{ backgroundColor: color }}
+                                onClick={() => changeColor(fund.id, color)}
+                              />
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                      {editingFundId === fund.id ? (
+                        <Input
+                          type="text"
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          onBlur={saveRename}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveRename();
+                            if (e.key === 'Escape') cancelRename();
+                          }}
+                          autoFocus
+                          className="h-7 w-32 text-sm font-medium"
+                        />
+                      ) : (
+                        <span
+                          className={`font-medium cursor-pointer hover:underline ${fund.hidden ? 'text-gray-400 line-through' : 'text-gray-800'}`}
+                          onClick={() => startRename(fund)}
+                          title="Click to rename"
+                        >
+                          {fund.name}
+                        </span>
+                      )}
+                      {fund.hidden && <span className="text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded">Hidden</span>}
                     </div>
                     <div className="flex items-center gap-2 md:gap-4">
-                      <span className="text-xs md:text-sm text-gray-600">
+                      <span className={`text-xs md:text-sm ${fund.hidden ? 'text-gray-400' : 'text-gray-600'}`}>
                         {fund.percentage.toFixed(1)}% • ${((totalBudget * fund.percentage) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleHide(fund.id)}
+                        className={`p-2 ${fund.hidden ? 'text-gray-400 hover:text-gray-600' : 'text-gray-500 hover:text-gray-700'}`}
+                        title={fund.hidden ? 'Show fund' : 'Hide fund'}
+                      >
+                        {fund.hidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </Button>
                       {funds.length > 1 && (
                         <Button
                           variant="ghost"
@@ -437,12 +535,13 @@ const BudgetAllocator = () => {
               <h3 className="text-sm font-medium text-gray-700 mb-8">Allocation Slider</h3>
               <div className="relative overflow-x-auto" style={{ height: '150px', marginBottom: '40px' }}>
                 {/* Labels above slider */}
-                {funds.map((fund, idx) => {
+                {visibleFunds.map((fund, idx) => {
                   let cumulativePercentage = 0;
                   for (let i = 0; i < idx; i++) {
-                    cumulativePercentage += funds[i].percentage;
+                    cumulativePercentage += (visibleFunds[i].percentage / visibleTotal) * 100;
                   }
-                  const position = cumulativePercentage + fund.percentage / 2;
+                  const scaledPercentage = (fund.percentage / visibleTotal) * 100;
+                  const position = cumulativePercentage + scaledPercentage / 2;
                   
                   return (
                     <div
@@ -467,11 +566,12 @@ const BudgetAllocator = () => {
                   style={{ top: '90px', backgroundColor: '#e5e7eb', touchAction: 'none' }}
                   ref={sliderRef}
                 >
-                  {funds.map((fund, idx) => {
+                  {visibleFunds.map((fund, idx) => {
                     let cumulativePercentage = 0;
                     for (let i = 0; i < idx; i++) {
-                      cumulativePercentage += funds[i].percentage;
+                      cumulativePercentage += (visibleFunds[i].percentage / visibleTotal) * 100;
                     }
+                    const scaledPercentage = (fund.percentage / visibleTotal) * 100;
                     
                     return (
                       <div
@@ -479,7 +579,7 @@ const BudgetAllocator = () => {
                         className="absolute h-full transition-all duration-150 ease-out"
                         style={{
                           left: `${cumulativePercentage}%`,
-                          width: `${fund.percentage}%`,
+                          width: `${scaledPercentage}%`,
                           backgroundColor: fund.color,
                         }}
                       />
@@ -488,13 +588,16 @@ const BudgetAllocator = () => {
                 </div>
 
                 {/* Handles */}
-                {funds.map((fund, idx) => {
+                {visibleFunds.map((fund, idx) => {
                   let cumulativePercentage = 0;
                   for (let i = 0; i <= idx; i++) {
-                    cumulativePercentage += funds[i].percentage;
+                    cumulativePercentage += (visibleFunds[i].percentage / visibleTotal) * 100;
                   }
                   
-                  if (idx === funds.length - 1) return null; // No handle after last fund
+                  if (idx === visibleFunds.length - 1) return null; // No handle after last fund
+                  
+                  // Find the actual index in the full funds array for dragging
+                  const actualIdx = funds.findIndex(f => f.id === fund.id);
                   
                   return (
                     <div
@@ -503,11 +606,11 @@ const BudgetAllocator = () => {
                       style={{ left: `${cumulativePercentage}%`, top: '84px', touchAction: 'none' }}
                       onMouseDown={(e) => {
                         e.preventDefault();
-                        setDragging({ fundId: fund.id, idx });
+                        setDragging({ fundId: fund.id, idx: actualIdx });
                       }}
                       onTouchStart={(e) => {
                         e.preventDefault();
-                        setDragging({ fundId: fund.id, idx });
+                        setDragging({ fundId: fund.id, idx: actualIdx });
                       }}
                     >
                       <div 
