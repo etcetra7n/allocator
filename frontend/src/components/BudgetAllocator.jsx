@@ -522,7 +522,7 @@ const BudgetAllocator = () => {
           </CardHeader>
           <CardContent className="p-4 md:p-8">
             {/* Total Budget Input */}
-            <div className="mb-12 max-w-md">
+            <div className="mb-12 max-w-sm">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Total Budget Amount
               </label>
@@ -575,7 +575,7 @@ const BudgetAllocator = () => {
             </div>
 
             {/* Funds List */}
-            <div className="mb-8 max-w-3xl">
+            <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-gray-700">Your Funds</h3>
                 <div className="text-sm">
