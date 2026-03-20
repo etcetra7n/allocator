@@ -41,6 +41,81 @@ const BudgetAllocator = () => {
   const [editingName, setEditingName] = useState('');
   const [colorPickerOpen, setColorPickerOpen] = useState(null);
 
+  const addAmountEqually = (fundsList, recipientIds, amount) => {
+    if (!amount || recipientIds.length === 0) return fundsList;
+    const share = amount / recipientIds.length;
+    const recipientSet = new Set(recipientIds);
+
+    return fundsList.map((fund) =>
+      recipientSet.has(fund.id)
+        ? { ...fund, percentage: fund.percentage + share }
+        : fund
+    );
+  };
+
+  const subtractAmountEqually = (fundsList, recipientIds, amount) => {
+    if (!amount || recipientIds.length === 0) {
+      return { funds: fundsList, actualTaken: 0 };
+    }
+
+    let remaining = amount;
+    let updatedFunds = fundsList.map((fund) => ({ ...fund }));
+    let adjustableIds = recipientIds.slice();
+    const epsilon = 0.000001;
+
+    // Remove equally without letting any fund go negative.
+    while (remaining > epsilon && adjustableIds.length > 0) {
+      const share = remaining / adjustableIds.length;
+      const adjustableSet = new Set(adjustableIds);
+      const nextAdjustable = [];
+
+      updatedFunds = updatedFunds.map((fund) => {
+        if (!adjustableSet.has(fund.id)) return fund;
+
+        const take = Math.min(fund.percentage, share);
+        const nextPercentage = fund.percentage - take;
+        remaining -= take;
+
+        if (nextPercentage > epsilon) {
+          nextAdjustable.push(fund.id);
+        }
+
+        return { ...fund, percentage: nextPercentage };
+      });
+
+      adjustableIds = nextAdjustable;
+    }
+
+    return { funds: updatedFunds, actualTaken: amount - remaining };
+  };
+
+  const normalizeHiddenFunds = (fundsList) => {
+    const visibleIds = fundsList.filter((fund) => !fund.hidden).map((fund) => fund.id);
+    if (visibleIds.length === 0) return fundsList;
+
+    let updatedFunds = fundsList.map((fund) => ({ ...fund }));
+
+    updatedFunds.forEach((fund) => {
+      if (!fund.hidden) return;
+      if (fund.percentage <= 0) return;
+
+      const stashed =
+        typeof fund.stashedPercentage === 'number' && fund.stashedPercentage > 0
+          ? fund.stashedPercentage
+          : fund.percentage;
+
+      updatedFunds = updatedFunds.map((item) =>
+        item.id === fund.id
+          ? { ...item, stashedPercentage: stashed, percentage: 0 }
+          : item
+      );
+
+      updatedFunds = addAmountEqually(updatedFunds, visibleIds, stashed);
+    });
+
+    return updatedFunds;
+  };
+
   // Load from localStorage on mount
   useEffect(() => {
     const savedData = localStorage.getItem('budgetAllocator');
@@ -48,7 +123,9 @@ const BudgetAllocator = () => {
       const { totalBudget: saved, funds: savedFunds } = JSON.parse(savedData);
       setTotalBudget(saved);
       setBudgetInput(String(saved));
-      setFunds(savedFunds);
+      if (Array.isArray(savedFunds)) {
+        setFunds(normalizeHiddenFunds(savedFunds));
+      }
     }
   }, []);
 
@@ -63,32 +140,39 @@ const BudgetAllocator = () => {
       const x = clientX - rect.left;
       const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
 
-      // Calculate which fund boundary this represents
-      const { idx } = dragging;
-      
-      // Get cumulative percentage up to this fund
+      const { leftId, rightId } = dragging;
+      const leftIndex = funds.findIndex((fund) => fund.id === leftId);
+      const rightIndex = funds.findIndex((fund) => fund.id === rightId);
+
+      if (leftIndex === -1 || rightIndex === -1 || leftIndex >= rightIndex) return;
+
       let minPercentage = 0;
-      for (let i = 0; i < idx; i++) {
+      for (let i = 0; i < leftIndex; i++) {
         minPercentage += funds[i].percentage;
       }
-      
-      // Get cumulative percentage after this fund
+
       let maxPercentage = 100;
-      for (let i = idx + 2; i < funds.length; i++) {
+      for (let i = rightIndex + 1; i < funds.length; i++) {
         maxPercentage -= funds[i].percentage;
       }
 
-      // Clamp the percentage
-      const clampedPercentage = Math.max(minPercentage + 1, Math.min(maxPercentage - 1, percentage));
+      let betweenTotal = 0;
+      for (let i = leftIndex + 1; i < rightIndex; i++) {
+        betweenTotal += funds[i].percentage;
+      }
 
-      // Calculate new percentages for the two adjacent funds
-      const leftFundPercentage = clampedPercentage - minPercentage;
+      const minPosition = minPercentage + betweenTotal + 1;
+      const maxPosition = maxPercentage - 1;
+      if (minPosition >= maxPosition) return;
+
+      const clampedPercentage = Math.max(minPosition, Math.min(maxPosition, percentage));
+
+      const leftFundPercentage = clampedPercentage - minPercentage - betweenTotal;
       const rightFundPercentage = maxPercentage - clampedPercentage;
 
-      // Update funds
       const newFunds = [...funds];
-      newFunds[idx] = { ...newFunds[idx], percentage: leftFundPercentage };
-      newFunds[idx + 1] = { ...newFunds[idx + 1], percentage: rightFundPercentage };
+      newFunds[leftIndex] = { ...newFunds[leftIndex], percentage: leftFundPercentage };
+      newFunds[rightIndex] = { ...newFunds[rightIndex], percentage: rightFundPercentage };
       setFunds(newFunds);
     };
 
@@ -135,12 +219,18 @@ const BudgetAllocator = () => {
     // If no remaining percentage, redistribute by taking equally from all existing funds
     if (remainingPercentage === 0) {
       const redistributionAmount = 10; // Take 10% for new fund
-      const takeFromEach = redistributionAmount / funds.length;
+      const visibleFundsList = funds.filter((f) => !f.hidden);
+      if (visibleFundsList.length === 0) return;
+      const takeFromEach = redistributionAmount / visibleFundsList.length;
       
-      const adjustedFunds = funds.map(f => ({
-        ...f,
-        percentage: Math.max(5, f.percentage - takeFromEach) // Don't go below 5%
-      }));
+      const adjustedFunds = funds.map(f => (
+        f.hidden
+          ? f
+          : {
+              ...f,
+              percentage: Math.max(5, f.percentage - takeFromEach) // Don't go below 5%
+            }
+      ));
       
       // Calculate actual amount taken
       const actualTaken = funds.reduce((sum, f, idx) => 
@@ -195,9 +285,75 @@ const BudgetAllocator = () => {
   };
 
   const toggleHide = (id) => {
-    setFunds(funds.map(f => 
-      f.id === id ? { ...f, hidden: !f.hidden } : f
-    ));
+    setFunds((prevFunds) => {
+      const target = prevFunds.find((fund) => fund.id === id);
+      if (!target) return prevFunds;
+
+      if (!target.hidden) {
+        const hiddenAmount = target.percentage;
+        const recipientIds = prevFunds
+          .filter((fund) => !fund.hidden && fund.id !== id)
+          .map((fund) => fund.id);
+
+        let updatedFunds = prevFunds.map((fund) =>
+          fund.id === id
+            ? {
+                ...fund,
+                hidden: true,
+                stashedPercentage: hiddenAmount,
+                percentage: 0,
+              }
+            : fund
+        );
+
+        if (hiddenAmount > 0 && recipientIds.length > 0) {
+          updatedFunds = addAmountEqually(updatedFunds, recipientIds, hiddenAmount);
+        }
+
+        return updatedFunds;
+      }
+
+      const restoreAmount = target.stashedPercentage ?? 0;
+      const recipientIds = prevFunds
+        .filter((fund) => !fund.hidden && fund.id !== id)
+        .map((fund) => fund.id);
+
+      let updatedFunds = prevFunds.map((fund) =>
+        fund.id === id
+          ? { ...fund, hidden: false }
+          : fund
+      );
+
+      if (restoreAmount > 0 && recipientIds.length > 0) {
+        const { funds: reducedFunds, actualTaken } = subtractAmountEqually(
+          updatedFunds,
+          recipientIds,
+          restoreAmount
+        );
+
+        updatedFunds = reducedFunds.map((fund) =>
+          fund.id === id
+            ? {
+                ...fund,
+                percentage: actualTaken,
+                stashedPercentage: undefined,
+              }
+            : fund
+        );
+
+        return updatedFunds;
+      }
+
+      return updatedFunds.map((fund) =>
+        fund.id === id
+          ? {
+              ...fund,
+              percentage: restoreAmount,
+              stashedPercentage: undefined,
+            }
+          : fund
+      );
+    });
   };
 
   const startRename = (fund) => {
@@ -358,7 +514,7 @@ const BudgetAllocator = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-4 md:py-12 px-4">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <Card className="shadow-lg">
           <CardHeader className="border-b bg-white">
             <CardTitle className="text-2xl md:text-3xl font-semibold text-gray-800">Budget Allocator</CardTitle>
@@ -366,7 +522,7 @@ const BudgetAllocator = () => {
           </CardHeader>
           <CardContent className="p-4 md:p-8">
             {/* Total Budget Input */}
-            <div className="mb-12">
+            <div className="mb-12 max-w-md">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Total Budget Amount
               </label>
@@ -398,7 +554,7 @@ const BudgetAllocator = () => {
             </div>
 
             {/* Add Fund Section */}
-            <div className="mb-12">
+            <div className="mb-12 max-w-lg">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Add New Fund
               </label>
@@ -419,7 +575,7 @@ const BudgetAllocator = () => {
             </div>
 
             {/* Funds List */}
-            <div className="mb-8">
+            <div className="mb-8 max-w-3xl">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-gray-700">Your Funds</h3>
                 <div className="text-sm">
@@ -533,7 +689,7 @@ const BudgetAllocator = () => {
             {/* Multi-handle Slider */}
             <div className="mt-8 md:mt-16">
               <h3 className="text-sm font-medium text-gray-700 mb-8">Allocation Slider</h3>
-              <div className="relative overflow-x-auto" style={{ height: '150px', marginBottom: '40px' }}>
+              <div className="relative overflow-visible" style={{ height: '150px', marginBottom: '40px' }}>
                 {/* Labels above slider */}
                 {visibleFunds.map((fund, idx) => {
                   let cumulativePercentage = 0;
@@ -597,7 +753,8 @@ const BudgetAllocator = () => {
                   if (idx === visibleFunds.length - 1) return null; // No handle after last fund
                   
                   // Find the actual index in the full funds array for dragging
-                  const actualIdx = funds.findIndex(f => f.id === fund.id);
+                  const leftFund = fund;
+                  const rightFund = visibleFunds[idx + 1];
                   
                   return (
                     <div
@@ -606,11 +763,11 @@ const BudgetAllocator = () => {
                       style={{ left: `${cumulativePercentage}%`, top: '84px', touchAction: 'none' }}
                       onMouseDown={(e) => {
                         e.preventDefault();
-                        setDragging({ fundId: fund.id, idx: actualIdx });
+                        setDragging({ leftId: leftFund.id, rightId: rightFund.id });
                       }}
                       onTouchStart={(e) => {
                         e.preventDefault();
-                        setDragging({ fundId: fund.id, idx: actualIdx });
+                        setDragging({ leftId: leftFund.id, rightId: rightFund.id });
                       }}
                     >
                       <div 
